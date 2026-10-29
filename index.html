@@ -209,6 +209,11 @@ h2,h3,.bn h2{color:#8fd9b3;text-shadow:0 0 1px #2f9b6b,0 0 1px #2f9b6b,0 1px 1px
 .b3 h2,.b3 p{color:#fff;text-shadow:0 0 1px #d19a00,0 0 1px #d19a00,0 1px 2px rgba(209,154,0,.6)}
 .ib{background:#ff9cbc;color:#fff;box-shadow:inset 0 0 0 2px #ffc2d6}
 .sb{width:76px}
+.grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
+@media (max-width:600px){.grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.card .in{padding:8px 10px 10px}.card .nm{font-size:13px}.price{font-size:15px}.card .btn{font-size:12px;padding:7px 4px}}
+.orn .st{color:#ffc2d6}.orn .s2{color:#d9ccf7}.orn .s3{color:#ffd0e0}
+.chip,.chip[aria-pressed="true"]{color:#fff;text-shadow:0 0 1px #ff9cbc,0 0 1px #ff9cbc,0 1px 2px rgba(255,156,188,.7)}
+.chip[aria-pressed="true"]{background:#ffbdd3;box-shadow:inset 0 0 0 2px #ffd6e4}
 </style>
 </head>
 <body>
@@ -249,7 +254,7 @@ h2,h3,.bn h2{color:#8fd9b3;text-shadow:0 0 1px #2f9b6b,0 0 1px #2f9b6b,0 1px 1px
 <p><b id="shopName">Custom Stuff</b> · for fangirls, by fangirl ♡ · Info toko dan kontak akan diisi owner.</p>
 <p>Checkout WhatsApp hanya menyiapkan pesan. Ini bukan bukti pembayaran; pesanan baru sah setelah dikonfirmasi owner.</p>
 <h3 class="orn"><svg class="st s1"><use href="#sp"/></svg>Hubungi kami<svg class="st s3"><use href="#hr"/></svg></h3><div class="soc" id="soc"></div>
-<p><button id="openTrack">Lacak pesanan</button> · <a href="admin.html" rel="nofollow" style="color:var(--mute)">Login owner</a></p>
+<p><button id="openTrack">Lacak pesanan</button> <span id="ownBox" hidden>· <a href="admin.html" rel="nofollow" style="color:var(--mute)">Login owner</a></span></p>
 </div></footer>
 
 <nav class="bnav" aria-label="Menu bawah"><button id="bHome"><svg class="st "><use href="#sp"/></svg>Beranda</button><button id="bCat"><svg class="st "><use href="#sp"/></svg>Katalog</button><button id="bCart"><svg class="st "><use href="#sp"/></svg>Keranjang</button><button id="bTrack"><svg class="st"><use href="#sp"/></svg>Lacak</button><button id="bInfo"><svg class="st "><use href="#sp"/></svg>Info</button></nav>
@@ -425,6 +430,7 @@ $("tGo").onclick=async()=>{
 };
 $("q").oninput=renderGrid;
 $("bHome").onclick=()=>scrollTo({top:0,behavior:"smooth"});$("bCat").onclick=()=>$("katalog").scrollIntoView({behavior:"smooth"});$("bCart").onclick=()=>$("openCart").click();$("bInfo").onclick=()=>$("kontak").scrollIntoView({behavior:"smooth"});
+try{if(localStorage.getItem("cs_admin"))$("ownBox").hidden=false}catch(e){}
 load();
 function wall(){
  const W=innerWidth,H=innerHeight,u=Math.min(W,560),R=Math.PI/180;
