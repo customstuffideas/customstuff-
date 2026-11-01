@@ -27,6 +27,7 @@ details{background:#fff;border:1px solid var(--ln);border-radius:12px;margin:8px
 .th{display:flex;gap:6px;flex-wrap:wrap}.th div{position:relative}.th img{width:70px;height:70px;object-fit:cover;border-radius:10px;display:block}.th button{position:absolute;top:-6px;right:-6px;padding:0;width:22px;height:22px;border-radius:50%}
 #msg{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--tx);color:#fff;padding:9px 16px;border-radius:10px;z-index:9}
 [hidden]{display:none!important}
+.tiles{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}.tiles button{flex:0 0 auto;min-width:84px;background:#fff;color:var(--tx);border:1.5px solid var(--ln);border-radius:12px;padding:8px 10px}.tiles b{display:block;font-size:20px;color:var(--pd)}.tiles .on{background:#ffe3ed;border-color:var(--pk)}
 </style>
 </head>
 <body>
@@ -40,11 +41,11 @@ details{background:#fff;border:1px solid var(--ln);border-radius:12px;margin:8px
 </div>
 <div id="app" hidden>
 <header><b>Custom Stuff · Owner</b><span><a href="index.html">Toko</a> &nbsp; <button id="out">Keluar</button></span></header>
-<nav id="tabs"><button data-t="o" class="on">Pesanan</button><button data-t="p">Produk</button><button data-t="s">Pengaturan</button></nav>
+<nav id="tabs"><button data-t="o" class="on">Pesanan</button><button data-t="p">Produk</button><button data-t="b">Banner</button><button data-t="s">Pengaturan</button></nav>
 <main>
 <section id="o">
-<div class="sum" id="sm"></div>
-<div class="row" style="margin-top:10px"><input id="oq" placeholder="Cari nomor pesanan"><select id="of"><option value="open">Belum selesai</option><option value="new">Menunggu konfirmasi</option><option value="all">Semua</option></select></div>
+<div class="tiles" id="sm"></div>
+<input id="oq" placeholder="Cari nomor pesanan (mencari di semua status)" style="margin-top:10px">
 <div id="ol"></div>
 </section>
 <section id="p" hidden>
@@ -64,6 +65,23 @@ details{background:#fff;border:1px solid var(--ln);border-radius:12px;margin:8px
 </div>
 <div id="pl"></div>
 </section>
+<section id="b" hidden>
+<button id="bnew">Tambah banner</button>
+<p class="mu">Banner tampil di bawah logo di halaman toko. Foto sebaiknya lebar (sekitar 1200×600). Kalau tidak ada banner aktif, bagian ini disembunyikan dari toko.</p>
+<div id="bf" class="card" hidden>
+<h2 id="bft">Banner</h2>
+<label for="bt">Judul (boleh kosong kalau memakai foto)</label><input id="bt" maxlength="80">
+<label for="bsub">Keterangan singkat</label><input id="bsub" maxlength="140">
+<label for="blk">Link tujuan (opsional, awali dengan https:// atau #katalog)</label><input id="blk" placeholder="#katalog">
+<div class="row"><div><label for="bord">Urutan (angka kecil tampil lebih dulu)</label><input id="bord" type="number" value="1"></div></div>
+<label><input id="bact" type="checkbox" style="width:auto" checked> Tampilkan di toko</label>
+<label>Foto banner (opsional, JPG/PNG/WebP, otomatis diperkecil)</label>
+<div class="th" id="bth"></div>
+<input id="bfile" type="file" accept="image/jpeg,image/png,image/webp" style="margin-top:8px">
+<div class="row" style="margin-top:10px"><button id="bsv">Simpan banner</button><button class="g" id="bcx">Tutup</button></div>
+</div>
+<div id="blist"></div>
+</section>
 <section id="s" hidden>
 <div class="card">
 <label for="s1">Nama toko</label><input id="s1">
@@ -71,6 +89,7 @@ details{background:#fff;border:1px solid var(--ln);border-radius:12px;margin:8px
 <label for="s3">Instagram (username atau link)</label><input id="s3">
 <label for="s4">TikTok (username atau link)</label><input id="s4">
 <label for="s5">Shopee (username toko atau link)</label><input id="s5">
+<label for="s6">Pilihan kurir untuk pembeli (satu per baris)</label><textarea id="s6" rows="5"></textarea>
 <button id="ssv" style="margin-top:12px">Simpan pengaturan</button>
 </div>
 </section>
@@ -84,7 +103,7 @@ const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&
 const rp=n=>"Rp"+Number(n).toLocaleString("id-ID");
 const dt=x=>new Date(x).toLocaleString("id-ID",{dateStyle:"medium",timeStyle:"short"});
 const ST=["Menunggu konfirmasi","Menunggu pembayaran","Pembayaran dikonfirmasi","Sedang diproses","Sedang dikemas","Dikirim","Selesai","Dibatalkan"];
-const CO=["","JNE","J&T","SiCepat","AnterAja","Pos Indonesia","Lainnya"];
+let CO=["","JNE","J&T","SiCepat","AnterAja","Pos Indonesia","Lainnya"];
 let S=null;try{S=JSON.parse(localStorage.getItem("cs_admin"))}catch(e){}
 let O=[],CATS=[],PR=[],IM=[],EID=null;
 function msg(t){const m=$("msg");m.textContent=t;m.hidden=false;setTimeout(()=>m.hidden=true,2600)}
@@ -117,11 +136,11 @@ async function start(){
   const ok=await rest("rpc/is_admin",{method:"POST",body:"{}"});
   if(ok!==true)return logout("Akun ini bukan owner toko.");
   $("login").hidden=true;$("app").hidden=false;
-  await Promise.all([loadO(),loadP(),loadS()])
+  await Promise.all([loadO(),loadP(),loadS(),loadB()])
 }
 $("tabs").onclick=e=>{const t=e.target.dataset.t;if(!t)return;
   document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("on",b===e.target));
-  ["o","p","s"].forEach(i=>$(i).hidden=i!==t)};
+  ["o","p","b","s"].forEach(i=>$(i).hidden=i!==t)};
 // ===== PESANAN =====
 async function loadO(){
   try{
@@ -130,32 +149,42 @@ async function loadO(){
     renderO()
   }catch(e){msg(e.message)}
 }
+const GR=[["Baru",["Menunggu konfirmasi"]],["Belum bayar",["Menunggu pembayaran"]],["Diproses",["Pembayaran dikonfirmasi","Sedang diproses"]],["Dikemas",["Sedang dikemas"]],["Dikirim",["Dikirim"]],["Selesai",["Selesai"]],["Dibatalkan",["Dibatalkan"]]];let G=0;
 function renderO(){
-  const open=o=>!["Selesai","Dibatalkan"].includes(o.status),f=$("of").value;
-  $("sm").innerHTML=`<div><b>${O.length}</b>Pesanan</div><div><b>${O.filter(o=>o.status==="Menunggu konfirmasi").length}</b>Baru</div><div><b>${O.filter(open).length}</b>Belum selesai</div>`;
-  const L=O.filter(o=>f==="all"||(f==="new"?o.status==="Menunggu konfirmasi":open(o)));
+  $("sm").innerHTML=GR.map((g,i)=>`<button data-g="${i}" class="${i===G?"on":""}"><b>${O.filter(o=>g[1].includes(o.status)).length}</b>${g[0]}</button>`).join("");
+  const L=$("oq").value.trim()?O:O.filter(o=>GR[G][1].includes(o.status));
   $("ol").innerHTML=L.length?L.map(o=>{
     const wa=o.phone.replace(/\D/g,"").replace(/^0/,"62");
     return `<details data-id="${o.id}"><summary><b>${esc(o.order_no)}</b> · ${esc(o.customer_name)}<br><span class="bd">${esc(o.status)}</span> ${rp(o.total)} · <span class="mu">${dt(o.created_at)}</span></summary><div class="in">
 <p>${o.order_items.map(i=>esc(i.name)+" × "+i.qty+" = "+rp(i.price*i.qty)).join("<br>")}</p>
 <p class="mu">HP: <a href="https://wa.me/${wa}" target="_blank" rel="noopener">${esc(o.phone)}</a><br>${esc(o.address)}, ${esc(o.city)} ${esc(o.postal_code)}<br>Kurir pilihan pembeli: ${esc(o.courier_pref||"-")}${o.note?"<br>Catatan pembeli: "+esc(o.note):""}</p>
 <label>Status</label><select class="st">${ST.map(s=>`<option${s===o.status?" selected":""}>${s}</option>`).join("")}</select>
-<div class="row"><div><label>Kurir</label><select class="co">${CO.map(c=>`<option${c===(o.courier||"")?" selected":""}>${esc(c)}</option>`).join("")}</select></div><div><label>Nomor resi</label><input class="rs" value="${esc(o.tracking_no||"")}"></div></div>
+<div class="row"><div><label>Kurir</label><select class="co">${[...new Set([...CO,o.courier||""])].map(c=>`<option${c===(o.courier||"")?" selected":""}>${esc(c)}</option>`).join("")}</select></div><div><label>Nomor resi</label><input class="rs" value="${esc(o.tracking_no||"")}"></div></div>
 <label>Catatan owner (tidak terlihat pembeli)</label><textarea class="nt" rows="2">${esc(o.admin_note||"")}</textarea>
-<div class="row" style="margin-top:8px"><button class="sv">Simpan</button><button class="g fin">Tandai selesai</button><button class="g cx">Batalkan</button><button class="g hs">Riwayat</button></div>
-<div class="hv mu"></div></div></details>`}).join(""):'<p class="mu">Belum ada pesanan.</p>'
+<div class="row" style="margin-top:8px"><button class="sv">Simpan</button><button class="g fin">Tandai selesai</button><button class="g cx">Batalkan</button><button class="g hs">Riwayat</button><button class="g wn">Kabari pembeli (WA)</button><button class="g rc">Kode akses baru</button></div>
+<div class="hv mu"></div></div></details>`}).join(""):'<p class="mu">Tidak ada pesanan di bagian ini.</p>'
 }
-$("oq").oninput=()=>{clearTimeout(window.__t);window.__t=setTimeout(loadO,350)};$("of").onchange=renderO;
+$("oq").oninput=()=>{clearTimeout(window.__t);window.__t=setTimeout(loadO,350)};$("sm").onclick=e=>{const b=e.target.closest("button");if(b){G=+b.dataset.g;renderO()}};
 $("ol").onclick=async e=>{
   const b=e.target.closest("button");if(!b)return;const d=b.closest("details"),id=d.dataset.id;
   const set=s=>d.querySelector(".st").value=s;
+  const o=O.find(x=>x.id===id),wp=o.phone.replace(/\D/g,"").replace(/^0/,"62");
+  if(b.classList.contains("wn")){
+    const s=d.querySelector(".st").value,c=d.querySelector(".co").value,r=d.querySelector(".rs").value.trim(),site=location.origin+location.pathname.replace(/admin\.html$/,"");
+    const t=s==="Dikirim"?`Halo ${o.customer_name}, pesanan ${o.order_no} sudah dikirim${c?" via "+c:""}${r?". Nomor resi: "+r:""}. Kamu bisa melacaknya di ${site} (menu Lacak). Terima kasih!`:s==="Dibatalkan"?`Halo ${o.customer_name}, mohon maaf pesanan ${o.order_no} dibatalkan. Kalau ada pertanyaan, balas pesan ini ya.`:`Halo ${o.customer_name}, status pesanan ${o.order_no}: ${s}.`;
+    window.open("https://wa.me/"+wp+"?text="+encodeURIComponent(t),"_blank","noopener");return}
+  if(b.classList.contains("rc")){
+    if(!confirm("Buat kode akses baru? Kode yang lama tidak akan berlaku lagi."))return;
+    try{const c=await rest("rpc/admin_reset_access_code",{method:"POST",body:JSON.stringify({p_order_id:id})});
+      d.querySelector(".hv").innerHTML=`Kode baru: <b>${esc(c)}</b> · <a href="https://wa.me/${wp}?text=${encodeURIComponent("Halo "+o.customer_name+", ini kode akses baru untuk melacak pesanan "+o.order_no+": "+c)}" target="_blank" rel="noopener">Kirim ke pembeli lewat WhatsApp</a>`}catch(x){msg(x.message)}
+    return}
   if(b.classList.contains("hs")){
     try{const h=await rest("order_status_history?order_id=eq."+id+"&order=changed_at");d.querySelector(".hv").innerHTML=h.map(x=>esc(x.status)+" · "+dt(x.changed_at)).join("<br>")}catch(x){msg(x.message)}return}
   if(b.classList.contains("fin"))set("Selesai");
   if(b.classList.contains("cx")){if(!confirm("Batalkan pesanan ini? Stok akan dikembalikan dan tidak bisa dibuka lagi."))return;set("Dibatalkan")}
   if(!b.matches(".sv,.fin,.cx"))return;
   b.disabled=true;
-  try{await rest("orders?id=eq."+id,{method:"PATCH",body:JSON.stringify({status:d.querySelector(".st").value,courier:d.querySelector(".co").value||null,tracking_no:d.querySelector(".rs").value.trim()||null,admin_note:d.querySelector(".nt").value.trim()||null})});msg("Tersimpan");await loadO()}
+  try{await rest("orders?id=eq."+id,{method:"PATCH",body:JSON.stringify({status:d.querySelector(".st").value,courier:d.querySelector(".co").value||null,tracking_no:d.querySelector(".rs").value.trim()||null,admin_note:d.querySelector(".nt").value.trim()||null})});msg("Tersimpan");const gi=GR.findIndex(g=>g[1].includes(d.querySelector(".st").value));if(gi>=0)G=gi;await loadO()}
   catch(x){msg(x.message);b.disabled=false}
 };
 // ===== PRODUK =====
@@ -200,9 +229,41 @@ $("psv").onclick=async()=>{
   const body=JSON.stringify({name,category_id:$("pc").value||null,description:$("pd").value.trim(),price,stock,images:IM,active:$("pa").checked});
   try{await rest(EID?"products?id=eq."+EID:"products",{method:EID?"PATCH":"POST",body});msg("Produk tersimpan");$("pf").hidden=true;loadP()}catch(e){msg(e.message)}
 };
+// ===== BANNER =====
+let BN=[],BEID=null,BIMG=null;
+async function upImg(f,dir){
+  if(!/^image\/(jpeg|png|webp)$/.test(f.type))throw new Error("Hanya JPG, PNG, atau WebP");
+  const bl=await shrink(f),path=dir+"/"+crypto.randomUUID()+".jpg";
+  const r=await fetch(U+"/storage/v1/object/store-images/"+path,{method:"POST",headers:{apikey:K,Authorization:"Bearer "+await tok(),"Content-Type":"image/jpeg"},body:bl});
+  if(!r.ok)throw new Error("Unggah gagal ("+r.status+")");
+  return U+"/storage/v1/object/public/store-images/"+path
+}
+async function loadB(){
+  try{
+    BN=await rest("banners?select=*&order=sort.asc");
+    $("blist").innerHTML=BN.map(b=>`<div class="card row" style="flex-wrap:nowrap">${b.image_url?`<img src="${esc(b.image_url)}" alt="" width="84" height="42" style="flex:none;width:84px;height:42px;object-fit:cover;border-radius:8px">`:`<div style="flex:none;width:84px;height:42px;border-radius:8px;background:#ffe3ed"></div>`}<div><b>${esc(b.title||"(tanpa judul)")}</b><br><span class="mu">urutan ${b.sort} · ${b.active?"tampil":"disembunyikan"}</span></div><button class="g" style="flex:none" data-be="${b.id}">Ubah</button><button class="g" style="flex:none" data-bd="${b.id}">Hapus</button></div>`).join("")||'<p class="mu">Belum ada banner.</p>'
+  }catch(e){msg(e.message)}
+}
+function bthumb(){$("bth").innerHTML=BIMG?`<div><img src="${esc(BIMG)}" alt="Foto banner" style="width:140px;height:70px"><button id="brm" aria-label="Hapus foto">×</button></div>`:""}
+function bform(b){BEID=b?b.id:null;$("bft").textContent=b?"Ubah banner":"Banner baru";$("bt").value=b?b.title:"";$("bsub").value=b?b.subtitle:"";$("blk").value=b&&b.link?b.link:"";$("bord").value=b?b.sort:BN.length+1;$("bact").checked=b?b.active:true;BIMG=b?b.image_url:null;bthumb();$("bf").hidden=false;$("bf").scrollIntoView()}
+$("bnew").onclick=()=>bform(null);$("bcx").onclick=()=>$("bf").hidden=true;
+$("bth").onclick=e=>{if(e.target.id==="brm"){BIMG=null;bthumb()}};
+$("bfile").onchange=async e=>{const f=e.target.files[0];e.target.value="";if(!f)return;try{BIMG=await upImg(f,"banners");bthumb()}catch(x){msg(x.message)}};
+$("blist").onclick=async e=>{
+  const be=e.target.dataset.be,bd=e.target.dataset.bd;
+  if(be)bform(BN.find(b=>b.id===be));
+  if(bd&&confirm("Hapus banner ini?")){try{await rest("banners?id=eq."+bd,{method:"DELETE"});msg("Banner dihapus");loadB()}catch(x){msg(x.message)}}
+};
+$("bsv").onclick=async()=>{
+  const t=$("bt").value.trim(),l=$("blk").value.trim();
+  if(!t&&!BIMG)return msg("Isi judul atau unggah foto");
+  if(l&&!/^(https?:\/\/|#)/.test(l))return msg("Link harus diawali https:// atau #");
+  const body=JSON.stringify({title:t,subtitle:$("bsub").value.trim(),link:l||null,sort:parseInt($("bord").value,10)||0,active:$("bact").checked,image_url:BIMG});
+  try{await rest(BEID?"banners?id=eq."+BEID:"banners",{method:BEID?"PATCH":"POST",body});msg("Banner tersimpan");$("bf").hidden=true;loadB()}catch(x){msg(x.message)}
+};
 // ===== PENGATURAN =====
-const SK={store_name:"s1",wa_number:"s2",instagram:"s3",tiktok:"s4",shopee:"s5"};
-async function loadS(){try{(await rest("store_settings?select=key,value")).forEach(r=>{if(SK[r.key])$(SK[r.key]).value=r.value})}catch(e){msg(e.message)}}
+const SK={store_name:"s1",wa_number:"s2",instagram:"s3",tiktok:"s4",shopee:"s5",couriers:"s6"};
+async function loadS(){try{(await rest("store_settings?select=key,value")).forEach(r=>{if(SK[r.key])$(SK[r.key]).value=r.value});if(!$("s6").value)$("s6").value="JNE\nJ&T\nSiCepat\nAnterAja\nPos Indonesia";const cl=$("s6").value.split(/\n|,/).map(x=>x.trim()).filter(Boolean);if(cl.length)CO=["",...cl];renderO()}catch(e){msg(e.message)}}
 $("ssv").onclick=async()=>{
   try{await rest("store_settings?on_conflict=key",{method:"POST",headers:{Prefer:"resolution=merge-duplicates"},body:JSON.stringify(Object.entries(SK).map(([key,id])=>({key,value:$(id).value.trim()})))});msg("Pengaturan tersimpan")}catch(e){msg(e.message)}
 };
