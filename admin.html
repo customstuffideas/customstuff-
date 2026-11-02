@@ -50,18 +50,21 @@ details{background:#fff;border:1px solid var(--ln);border-radius:12px;margin:8px
 </section>
 <section id="p" hidden>
 <div class="row"><button id="pnew">Tambah produk</button><button class="g" id="pcat">Tambah kategori</button></div>
+<div id="dnote"></div>
+<div id="catl" style="margin:10px 0"></div>
+<select id="pfil" style="margin:6px 0"><option value="all">Semua produk</option><option value="on">Tampil di toko</option><option value="draft">Draft (belum tampil)</option></select>
 <div id="pf" class="card" hidden>
 <h2 id="pft">Produk</h2>
 <label for="pn">Nama produk</label><input id="pn" maxlength="120">
 <label for="pc">Kategori</label><select id="pc"></select>
 <div class="row"><div><label for="pp">Harga (Rp)</label><input id="pp" type="number" min="0" inputmode="numeric"></div><div><label for="ps">Stok</label><input id="ps" type="number" min="0" inputmode="numeric"></div></div>
 <label for="pd">Deskripsi</label><textarea id="pd" rows="3"></textarea>
-<label><input id="pa" type="checkbox" style="width:auto" checked> Tampil di toko</label>
+<input id="pa" type="checkbox" checked hidden>
 <label>Foto (maksimal 10, JPG/PNG/WebP, otomatis diperkecil)</label>
 <div class="th" id="th"></div>
 <input id="pi" type="file" accept="image/jpeg,image/png,image/webp" multiple style="margin-top:8px">
 <p class="mu">Foto pertama menjadi sampul.</p>
-<div class="row"><button id="psv">Simpan produk</button><button class="g" id="pcx">Tutup</button></div>
+<div class="row"><button id="psv">Simpan &amp; tampilkan</button><button class="g" id="pdr">Simpan sebagai draft</button><button class="g" id="pcx">Tutup</button><button class="g" id="pdel" hidden>Hapus produk</button></div>
 </div>
 <div id="pl"></div>
 </section>
@@ -110,52 +113,51 @@ function msg(t){const m=$("msg");m.textContent=t;m.hidden=false;setTimeout(()=>m
 function sess(j){S={at:j.access_token,rt:j.refresh_token,exp:j.expires_at||Date.now()/1000+j.expires_in};try{localStorage.setItem("cs_admin",JSON.stringify(S))}catch(e){}}
 function logout(t){S=null;try{localStorage.removeItem("cs_admin")}catch(e){}$("app").hidden=true;$("login").hidden=false;$("le").textContent=t||""}
 async function tok(){
-  if(!S)throw new Error("Belum login");
-  if(S.exp-Date.now()/1000<60){
-    const r=await fetch(U+"/auth/v1/token?grant_type=refresh_token",{method:"POST",headers:{apikey:K,"Content-Type":"application/json"},body:JSON.stringify({refresh_token:S.rt})});
-    if(!r.ok){logout("Sesi habis, silakan login lagi");throw new Error("Sesi habis")}
-    sess(await r.json())
-  }
-  return S.at
+if(!S)throw new Error("Belum login");
+if(S.exp-Date.now()/1000<60){
+const r=await fetch(U+"/auth/v1/token?grant_type=refresh_token",{method:"POST",headers:{apikey:K,"Content-Type":"application/json"},body:JSON.stringify({refresh_token:S.rt})});
+if(!r.ok){logout("Sesi habis, silakan login lagi");throw new Error("Sesi habis")}
+sess(await r.json())
+}
+return S.at
 }
 async function rest(p,o={}){
-  const r=await fetch(U+"/rest/v1/"+p,{...o,headers:{apikey:K,Authorization:"Bearer "+await tok(),"Content-Type":"application/json",...(o.headers||{})}});
-  if(!r.ok){let m="";try{m=(await r.json()).message}catch(e){}throw new Error(m||"Gagal ("+r.status+")")}
-  return r.status===204||!(r.headers.get("content-type")||"").includes("json")?null:r.json()
+const r=await fetch(U+"/rest/v1/"+p,{...o,headers:{apikey:K,Authorization:"Bearer "+await tok(),"Content-Type":"application/json",...(o.headers||{})}});
+if(!r.ok){let m="";try{m=(await r.json()).message}catch(e){}throw new Error(m||"Gagal ("+r.status+")")}
+return r.status===204||!(r.headers.get("content-type")||"").includes("json")?null:r.json()
 }
 $("lg").onclick=async()=>{
-  $("le").textContent="";
-  try{
-    const r=await fetch(U+"/auth/v1/token?grant_type=password",{method:"POST",headers:{apikey:K,"Content-Type":"application/json"},body:JSON.stringify({email:$("em").value.trim(),password:$("pw").value})});
-    if(!r.ok)throw new Error("Email atau password salah");
-    sess(await r.json());$("pw").value="";await start()
-  }catch(e){$("le").textContent=e.message}
+$("le").textContent="";
+try{
+const r=await fetch(U+"/auth/v1/token?grant_type=password",{method:"POST",headers:{apikey:K,"Content-Type":"application/json"},body:JSON.stringify({email:$("em").value.trim(),password:$("pw").value})});
+if(!r.ok)throw new Error("Email atau password salah");
+sess(await r.json());$("pw").value="";await start()
+}catch(e){$("le").textContent=e.message}
 };
 $("out").onclick=()=>logout("");
 async function start(){
-  const ok=await rest("rpc/is_admin",{method:"POST",body:"{}"});
-  if(ok!==true)return logout("Akun ini bukan owner toko.");
-  $("login").hidden=true;$("app").hidden=false;
-  await Promise.all([loadO(),loadP(),loadS(),loadB()])
+const ok=await rest("rpc/is_admin",{method:"POST",body:"{}"});
+if(ok!==true)return logout("Akun ini bukan owner toko.");$("login").hidden=true;$("app").hidden=false;
+await Promise.all([loadO(),loadP(),loadS(),loadB()])
 }
 $("tabs").onclick=e=>{const t=e.target.dataset.t;if(!t)return;
-  document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("on",b===e.target));
-  ["o","p","b","s"].forEach(i=>$(i).hidden=i!==t)};
+document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("on",b===e.target));
+["o","p","b","s"].forEach(i=>$(i).hidden=i!==t)};
 // ===== PESANAN =====
 async function loadO(){
-  try{
-    const q=$("oq").value.trim();
-    O=await rest("orders?select=*,order_items(name,qty,price)&order=created_at.desc&limit=200"+(q?"&order_no=ilike.*"+encodeURIComponent(q)+"*":""));
-    renderO()
-  }catch(e){msg(e.message)}
+try{
+const q=$("oq").value.trim();
+O=await rest("orders?select=*,order_items(name,qty,price)&order=created_at.desc&limit=200"+(q?"&order_no=ilike.*"+encodeURIComponent(q)+"*":""));
+renderO()
+}catch(e){msg(e.message)}
 }
 const GR=[["Baru",["Menunggu konfirmasi"]],["Belum bayar",["Menunggu pembayaran"]],["Diproses",["Pembayaran dikonfirmasi","Sedang diproses"]],["Dikemas",["Sedang dikemas"]],["Dikirim",["Dikirim"]],["Selesai",["Selesai"]],["Dibatalkan",["Dibatalkan"]]];let G=0;
 function renderO(){
-  $("sm").innerHTML=GR.map((g,i)=>`<button data-g="${i}" class="${i===G?"on":""}"><b>${O.filter(o=>g[1].includes(o.status)).length}</b>${g[0]}</button>`).join("");
-  const L=$("oq").value.trim()?O:O.filter(o=>GR[G][1].includes(o.status));
-  $("ol").innerHTML=L.length?L.map(o=>{
-    const wa=o.phone.replace(/\D/g,"").replace(/^0/,"62");
-    return `<details data-id="${o.id}"><summary><b>${esc(o.order_no)}</b> · ${esc(o.customer_name)}<br><span class="bd">${esc(o.status)}</span> ${rp(o.total)} · <span class="mu">${dt(o.created_at)}</span></summary><div class="in">
+$("sm").innerHTML=GR.map((g,i)=>`<button data-g="${i}" class="${i===G?"on":""}"><b>${O.filter(o=>g[1].includes(o.status)).length}</b>${g[0]}</button>`).join("");
+const L=$("oq").value.trim()?O:O.filter(o=>GR[G][1].includes(o.status));
+$("ol").innerHTML=L.length?L.map(o=>{
+const wa=o.phone.replace(/\D/g,"").replace(/^0/,"62");
+return `<details data-id="${o.id}"><summary><b>${esc(o.order_no)}</b> · ${esc(o.customer_name)}<br><span class="bd">${esc(o.status)}</span> ${rp(o.total)} · <span class="mu">${dt(o.created_at)}</span></summary><div class="in">
 <p>${o.order_items.map(i=>esc(i.name)+" × "+i.qty+" = "+rp(i.price*i.qty)).join("<br>")}</p>
 <p class="mu">HP: <a href="https://wa.me/${wa}" target="_blank" rel="noopener">${esc(o.phone)}</a><br>${esc(o.address)}, ${esc(o.city)} ${esc(o.postal_code)}<br>Kurir pilihan pembeli: ${esc(o.courier_pref||"-")}${o.note?"<br>Catatan pembeli: "+esc(o.note):""}</p>
 <label>Status</label><select class="st">${ST.map(s=>`<option${s===o.status?" selected":""}>${s}</option>`).join("")}</select>
@@ -166,83 +168,104 @@ function renderO(){
 }
 $("oq").oninput=()=>{clearTimeout(window.__t);window.__t=setTimeout(loadO,350)};$("sm").onclick=e=>{const b=e.target.closest("button");if(b){G=+b.dataset.g;renderO()}};
 $("ol").onclick=async e=>{
-  const b=e.target.closest("button");if(!b)return;const d=b.closest("details"),id=d.dataset.id;
-  const set=s=>d.querySelector(".st").value=s;
-  const o=O.find(x=>x.id===id),wp=o.phone.replace(/\D/g,"").replace(/^0/,"62");
-  if(b.classList.contains("wn")){
-    const s=d.querySelector(".st").value,c=d.querySelector(".co").value,r=d.querySelector(".rs").value.trim(),site=location.origin+location.pathname.replace(/admin\.html$/,"");
-    const t=s==="Dikirim"?`Halo ${o.customer_name}, pesanan ${o.order_no} sudah dikirim${c?" via "+c:""}${r?". Nomor resi: "+r:""}. Kamu bisa melacaknya di ${site} (menu Lacak). Terima kasih!`:s==="Dibatalkan"?`Halo ${o.customer_name}, mohon maaf pesanan ${o.order_no} dibatalkan. Kalau ada pertanyaan, balas pesan ini ya.`:`Halo ${o.customer_name}, status pesanan ${o.order_no}: ${s}.`;
-    window.open("https://wa.me/"+wp+"?text="+encodeURIComponent(t),"_blank","noopener");return}
-  if(b.classList.contains("rc")){
-    if(!confirm("Buat kode akses baru? Kode yang lama tidak akan berlaku lagi."))return;
-    try{const c=await rest("rpc/admin_reset_access_code",{method:"POST",body:JSON.stringify({p_order_id:id})});
-      d.querySelector(".hv").innerHTML=`Kode baru: <b>${esc(c)}</b> · <a href="https://wa.me/${wp}?text=${encodeURIComponent("Halo "+o.customer_name+", ini kode akses baru untuk melacak pesanan "+o.order_no+": "+c)}" target="_blank" rel="noopener">Kirim ke pembeli lewat WhatsApp</a>`}catch(x){msg(x.message)}
-    return}
-  if(b.classList.contains("hs")){
-    try{const h=await rest("order_status_history?order_id=eq."+id+"&order=changed_at");d.querySelector(".hv").innerHTML=h.map(x=>esc(x.status)+" · "+dt(x.changed_at)).join("<br>")}catch(x){msg(x.message)}return}
-  if(b.classList.contains("fin"))set("Selesai");
-  if(b.classList.contains("cx")){if(!confirm("Batalkan pesanan ini? Stok akan dikembalikan dan tidak bisa dibuka lagi."))return;set("Dibatalkan")}
-  if(!b.matches(".sv,.fin,.cx"))return;
-  b.disabled=true;
-  try{await rest("orders?id=eq."+id,{method:"PATCH",body:JSON.stringify({status:d.querySelector(".st").value,courier:d.querySelector(".co").value||null,tracking_no:d.querySelector(".rs").value.trim()||null,admin_note:d.querySelector(".nt").value.trim()||null})});msg("Tersimpan");const gi=GR.findIndex(g=>g[1].includes(d.querySelector(".st").value));if(gi>=0)G=gi;await loadO()}
-  catch(x){msg(x.message);b.disabled=false}
+const b=e.target.closest("button");if(!b)return;const d=b.closest("details"),id=d.dataset.id;
+const set=s=>d.querySelector(".st").value=s;
+const o=O.find(x=>x.id===id),wp=o.phone.replace(/\D/g,"").replace(/^0/,"62");
+if(b.classList.contains("wn")){
+const s=d.querySelector(".st").value,c=d.querySelector(".co").value,r=d.querySelector(".rs").value.trim(),site=location.origin+location.pathname.replace(/admin\.html$/,"");
+const t=s==="Dikirim"?`Halo ${o.customer_name}, pesanan ${o.order_no} sudah dikirim${c?" via "+c:""}${r?". Nomor resi: "+r:""}. Kamu bisa melacaknya di ${site} (menu Lacak). Terima kasih!`:s==="Dibatalkan"?`Halo ${o.customer_name}, mohon maaf pesanan ${o.order_no} dibatalkan. Kalau ada pertanyaan, balas pesan ini ya.`:`Halo ${o.customer_name}, status pesanan ${o.order_no}: ${s}.`;
+window.open("https://wa.me/"+wp+"?text="+encodeURIComponent(t),"_blank","noopener");return}
+if(b.classList.contains("rc")){
+if(!confirm("Buat kode akses baru? Kode yang lama tidak akan berlaku lagi."))return;
+try{const c=await rest("rpc/admin_reset_access_code",{method:"POST",body:JSON.stringify({p_order_id:id})});
+d.querySelector(".hv").innerHTML=`Kode baru: <b>${esc(c)}</b> · <a href="https://wa.me/${wp}?text=${encodeURIComponent("Halo "+o.customer_name+", ini kode akses baru untuk melacak pesanan "+o.order_no+": "+c)}" target="_blank" rel="noopener">Kirim ke pembeli lewat WhatsApp</a>`}catch(x){msg(x.message)}
+return}
+if(b.classList.contains("hs")){
+try{const h=await rest("order_status_history?order_id=eq."+id+"&order=changed_at");d.querySelector(".hv").innerHTML=h.map(x=>esc(x.status)+" · "+dt(x.changed_at)).join("<br>")}catch(x){msg(x.message)}return}
+if(b.classList.contains("fin"))set("Selesai");
+if(b.classList.contains("cx")){if(!confirm("Batalkan pesanan ini? Stok akan dikembalikan dan tidak bisa dibuka lagi."))return;set("Dibatalkan")}
+if(!b.matches(".sv,.fin,.cx"))return;
+b.disabled=true;
+try{await rest("orders?id=eq."+id,{method:"PATCH",body:JSON.stringify({status:d.querySelector(".st").value,courier:d.querySelector(".co").value||null,tracking_no:d.querySelector(".rs").value.trim()||null,admin_note:d.querySelector(".nt").value.trim()||null})});msg("Tersimpan");const gi=GR.findIndex(g=>g[1].includes(d.querySelector(".st").value));if(gi>=0)G=gi;await loadO()}
+catch(x){msg(x.message);b.disabled=false}
 };
 // ===== PRODUK =====
 async function loadP(){
-  try{
-    [CATS,PR]=await Promise.all([rest("categories?select=id,name&order=sort"),rest("products?select=*&order=created_at.desc")]);
-    $("pc").innerHTML=CATS.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join("");
-    $("pl").innerHTML=PR.map(p=>`<div class="card row" style="flex-wrap:nowrap"><img src="${esc((p.images||[])[0]||"")}" alt="" width="56" height="56" style="flex:none;width:56px;height:56px;object-fit:cover;border-radius:10px;background:#ffe9f1"><div><b>${esc(p.name)}</b><br><span class="mu">${rp(p.price)} · stok ${p.stock} · ${p.active?"tampil":"disembunyikan"} · ${(p.images||[]).length} foto</span></div><button class="g" style="flex:none" data-e="${p.id}">Ubah</button></div>`).join("")||'<p class="mu">Belum ada produk.</p>'
-  }catch(e){msg(e.message)}
+try{
+[CATS,PR]=await Promise.all([rest("categories?select=id,name&order=sort"),rest("products?select=*&order=created_at.desc")]);
+$("pc").innerHTML=CATS.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join("");
+$("catl").innerHTML=CATS.map(c=>`<span class="bd" style="margin:2px">${esc(c.name)} <button class="g" data-cr="${c.id}" style="padding:2px 8px;font-size:12px">Ubah</button> <button class="g" data-cd="${c.id}" style="padding:2px 8px;font-size:12px">Hapus</button></span>`).join(" ");
+$("pl").innerHTML=PR.filter(p=>({all:1,on:p.active,draft:!p.active})[$("pfil").value]).map(p=>`<div class="card row" style="flex-wrap:nowrap"><img src="${esc((p.images||[])[0]||"")}" alt="" width="56" height="56" style="flex:none;width:56px;height:56px;object-fit:cover;border-radius:10px;background:#ffe9f1"><div>${p.active?"":'<span class="bd" style="background:#fff0c2">DRAFT</span> '}<b>${esc(p.name)}</b><br><span class="mu">${rp(p.price)} · stok ${p.stock} · ${p.active?"tampil":"draft"} · ${(p.images||[]).length} foto</span></div><button class="g" style="flex:none" data-e="${p.id}">Ubah</button></div>`).join("")||'<p class="mu">Belum ada produk.</p>'
+renderD()}catch(e){msg(e.message)}
 }
-function thumbs(){$("th").innerHTML=IM.map((u,i)=>`<div><img src="${esc(u)}" alt="Foto ${i+1}"><button data-r="${i}" aria-label="Hapus foto">×</button></div>`).join("")}
+function thumbs(){saveD();$("th").innerHTML=IM.map((u,i)=>`<div><img src="${esc(u)}" alt="Foto ${i+1}"><button data-r="${i}" aria-label="Hapus foto">×</button></div>`).join("")}
 function form(p){
-  EID=p?p.id:null;$("pft").textContent=p?"Ubah produk":"Produk baru";
-  $("pn").value=p?p.name:"";$("pp").value=p?p.price:"";$("ps").value=p?p.stock:"";$("pd").value=p?p.description:"";$("pa").checked=p?p.active:true;
-  if(p&&p.category_id)$("pc").value=p.category_id;IM=p?[...(p.images||[])]:[];thumbs();$("pf").hidden=false;$("pf").scrollIntoView()
+EID=p?p.id:null;$("pft").textContent=p?"Ubah produk":"Produk baru";
+$("pn").value=p?p.name:"";$("pp").value=p?p.price:"";$("ps").value=p?p.stock:"";$("pd").value=p?p.description:"";$("pa").checked=p?p.active:true;
+if(p&&p.category_id)$("pc").value=p.category_id;IM=p?[...(p.images||[])]:[];thumbs();$("pdel").hidden=!p;$("pf").hidden=false;$("pf").scrollIntoView()
 }
-$("pnew").onclick=()=>form(null);$("pcx").onclick=()=>$("pf").hidden=true;
+$("pnew").onclick=()=>form(null);$("pcx").onclick=()=>{$("pf").hidden=true;renderD()};
 $("pl").onclick=e=>{const id=e.target.dataset.e;if(id)form(PR.find(p=>p.id===id))};
 $("th").onclick=e=>{const i=e.target.dataset.r;if(i!==undefined){IM.splice(+i,1);thumbs()}};
 $("pcat").onclick=async()=>{const n=prompt("Nama kategori baru");if(!n||!n.trim())return;try{await rest("categories",{method:"POST",body:JSON.stringify({name:n.trim(),sort:CATS.length+1})});msg("Kategori ditambah");loadP()}catch(e){msg(e.message)}};
+$("pdel").onclick=async()=>{
+if(!EID||!confirm("Hapus produk ini selamanya? Riwayat pesanan lama tetap tersimpan. Kalau hanya ingin menyembunyikan, matikan 'Tampil di toko' lalu simpan."))return;
+try{await rest("products?id=eq."+EID,{method:"DELETE"});msg("Produk dihapus");$("pf").hidden=true;loadP()}catch(e){msg(e.message)}
+};
+$("catl").onclick=async e=>{
+const cr=e.target.dataset.cr,cd=e.target.dataset.cd;
+if(cr){const c=CATS.find(x=>x.id===cr),n=prompt("Nama kategori baru",c.name);if(!n||!n.trim()||n.trim()===c.name)return;try{await rest("categories?id=eq."+cr,{method:"PATCH",body:JSON.stringify({name:n.trim()})});msg("Kategori diubah");loadP()}catch(x){msg(x.message)}}
+if(cd){const c=CATS.find(x=>x.id===cd);if(!confirm("Hapus kategori "+c.name+"? Produk di dalamnya TIDAK ikut terhapus, tapi jadi tanpa kategori (tampil sebagai Lainnya)."))return;try{await rest("categories?id=eq."+cd,{method:"DELETE"});msg("Kategori dihapus");loadP()}catch(x){msg(x.message)}}
+};
 async function shrink(f){
-  const b=await createImageBitmap(f),k=Math.min(1,1200/Math.max(b.width,b.height)),c=document.createElement("canvas");
-  c.width=Math.round(b.width*k);c.height=Math.round(b.height*k);const x=c.getContext("2d");x.fillStyle="#fff";x.fillRect(0,0,c.width,c.height);x.drawImage(b,0,0,c.width,c.height);
-  const bl=await new Promise(r=>c.toBlob(r,"image/jpeg",.85));if(!bl||bl.size>2097152)throw new Error("Foto terlalu besar (maks 2 MB)");return bl
+const b=await createImageBitmap(f),k=Math.min(1,1200/Math.max(b.width,b.height)),c=document.createElement("canvas");
+c.width=Math.round(b.width*k);c.height=Math.round(b.height*k);const x=c.getContext("2d");x.fillStyle="#fff";x.fillRect(0,0,c.width,c.height);x.drawImage(b,0,0,c.width,c.height);
+const bl=await new Promise(r=>c.toBlob(r,"image/jpeg",.85));if(!bl||bl.size>2097152)throw new Error("Foto terlalu besar (maks 2 MB)");return bl
 }
 $("pi").onchange=async e=>{
-  for(const f of e.target.files){
-    if(IM.length>=10){msg("Maksimal 10 foto per produk");break}
-    try{
-      if(!/^image\/(jpeg|png|webp)$/.test(f.type))throw new Error("Hanya JPG, PNG, atau WebP");
-      const bl=await shrink(f),path="products/"+crypto.randomUUID()+".jpg";
-      const r=await fetch(U+"/storage/v1/object/store-images/"+path,{method:"POST",headers:{apikey:K,Authorization:"Bearer "+await tok(),"Content-Type":"image/jpeg"},body:bl});
-      if(!r.ok)throw new Error("Unggah gagal ("+r.status+")");
-      IM.push(U+"/storage/v1/object/public/store-images/"+path);thumbs()
-    }catch(x){msg(x.message)}
-  }
-  e.target.value=""
+for(const f of e.target.files){
+if(IM.length>=10){msg("Maksimal 10 foto per produk");break}
+try{
+if(!/^image\/(jpeg|png|webp)$/.test(f.type))throw new Error("Hanya JPG, PNG, atau WebP");
+const bl=await shrink(f),path="products/"+crypto.randomUUID()+".jpg";
+const r=await fetch(U+"/storage/v1/object/store-images/"+path,{method:"POST",headers:{apikey:K,Authorization:"Bearer "+await tok(),"Content-Type":"image/jpeg"},body:bl});
+if(!r.ok)throw new Error("Unggah gagal ("+r.status+")");
+IM.push(U+"/storage/v1/object/public/store-images/"+path);thumbs()
+}catch(x){msg(x.message)}
+}
+e.target.value=""
 };
-$("psv").onclick=async()=>{
-  const price=parseInt($("pp").value,10),stock=parseInt($("ps").value,10),name=$("pn").value.trim();
-  if(!name||!(price>=0)||!(stock>=0))return msg("Isi nama, harga, dan stok dengan benar");
-  const body=JSON.stringify({name,category_id:$("pc").value||null,description:$("pd").value.trim(),price,stock,images:IM,active:$("pa").checked});
-  try{await rest(EID?"products?id=eq."+EID:"products",{method:EID?"PATCH":"POST",body});msg("Produk tersimpan");$("pf").hidden=true;loadP()}catch(e){msg(e.message)}
+async function saveP(){
+const price=parseInt($("pp").value,10),stock=parseInt($("ps").value,10),name=$("pn").value.trim();
+if(!name||!(price>=0)||!(stock>=0))return msg("Isi nama, harga, dan stok dengan benar");
+const body=JSON.stringify({name,category_id:$("pc").value||null,description:$("pd").value.trim(),price,stock,images:IM,active:$("pa").checked});
+try{await rest(EID?"products?id=eq."+EID:"products",{method:EID?"PATCH":"POST",body});msg($("pa").checked?"Produk tersimpan dan tampil di toko":"Disimpan sebagai draft (belum tampil di toko)");$("pf").hidden=true;clrD();loadP()}catch(e){msg(e.message)}
+};
+$("psv").onclick=()=>{$("pa").checked=true;saveP()};$("pdr").onclick=()=>{$("pa").checked=false;saveP()};$("pfil").onchange=loadP;
+const DK="cs_pdraft";
+function getD(){try{return JSON.parse(localStorage.getItem(DK))}catch(e){return null}}
+function saveD(){if($("pf").hidden)return;const d={id:EID,n:$("pn").value,c:$("pc").value,p:$("pp").value,s:$("ps").value,d:$("pd").value,im:IM};if(!d.n&&!d.p&&!d.d&&!IM.length)return;try{localStorage.setItem(DK,JSON.stringify(d))}catch(e){}}
+function clrD(){try{localStorage.removeItem(DK)}catch(e){}renderD()}
+function renderD(){const d=getD();$("dnote").innerHTML=d&&$("pf").hidden?`<div class="card" style="background:#fff7d6">Ada draf produk yang belum disimpan: <b>${esc(d.n||"(tanpa nama)")}</b><div class="row" style="margin-top:6px"><button id="dres">Lanjutkan</button><button class="g" id="ddel">Buang</button></div></div>`:""}
+$("pf").addEventListener("input",saveD);$("pf").addEventListener("change",saveD);
+$("dnote").onclick=e=>{
+if(e.target.id==="ddel")clrD();
+if(e.target.id==="dres"){const d=getD();if(!d)return;form(d.id&&PR.find(x=>x.id===d.id)||null);$("pn").value=d.n;if(d.c)$("pc").value=d.c;$("pp").value=d.p;$("ps").value=d.s;$("pd").value=d.d;IM=d.im||[];thumbs();$("dnote").innerHTML=""}
 };
 // ===== BANNER =====
 let BN=[],BEID=null,BIMG=null;
 async function upImg(f,dir){
-  if(!/^image\/(jpeg|png|webp)$/.test(f.type))throw new Error("Hanya JPG, PNG, atau WebP");
-  const bl=await shrink(f),path=dir+"/"+crypto.randomUUID()+".jpg";
-  const r=await fetch(U+"/storage/v1/object/store-images/"+path,{method:"POST",headers:{apikey:K,Authorization:"Bearer "+await tok(),"Content-Type":"image/jpeg"},body:bl});
-  if(!r.ok)throw new Error("Unggah gagal ("+r.status+")");
-  return U+"/storage/v1/object/public/store-images/"+path
+if(!/^image\/(jpeg|png|webp)$/.test(f.type))throw new Error("Hanya JPG, PNG, atau WebP");
+const bl=await shrink(f),path=dir+"/"+crypto.randomUUID()+".jpg";
+const r=await fetch(U+"/storage/v1/object/store-images/"+path,{method:"POST",headers:{apikey:K,Authorization:"Bearer "+await tok(),"Content-Type":"image/jpeg"},body:bl});
+if(!r.ok)throw new Error("Unggah gagal ("+r.status+")");
+return U+"/storage/v1/object/public/store-images/"+path
 }
 async function loadB(){
-  try{
-    BN=await rest("banners?select=*&order=sort.asc");
-    $("blist").innerHTML=BN.map(b=>`<div class="card row" style="flex-wrap:nowrap">${b.image_url?`<img src="${esc(b.image_url)}" alt="" width="84" height="42" style="flex:none;width:84px;height:42px;object-fit:cover;border-radius:8px">`:`<div style="flex:none;width:84px;height:42px;border-radius:8px;background:#ffe3ed"></div>`}<div><b>${esc(b.title||"(tanpa judul)")}</b><br><span class="mu">urutan ${b.sort} · ${b.active?"tampil":"disembunyikan"}</span></div><button class="g" style="flex:none" data-be="${b.id}">Ubah</button><button class="g" style="flex:none" data-bd="${b.id}">Hapus</button></div>`).join("")||'<p class="mu">Belum ada banner.</p>'
-  }catch(e){msg(e.message)}
+try{
+BN=await rest("banners?select=*&order=sort.asc");
+$("blist").innerHTML=BN.map(b=>`<div class="card row" style="flex-wrap:nowrap">${b.image_url?`<img src="${esc(b.image_url)}" alt="" width="84" height="42" style="flex:none;width:84px;height:42px;object-fit:cover;border-radius:8px">`:`<div style="flex:none;width:84px;height:42px;border-radius:8px;background:#ffe3ed"></div>`}<div><b>${esc(b.title||"(tanpa judul)")}</b><br><span class="mu">urutan ${b.sort} · ${b.active?"tampil":"disembunyikan"}</span></div><button class="g" style="flex:none" data-be="${b.id}">Ubah</button><button class="g" style="flex:none" data-bd="${b.id}">Hapus</button></div>`).join("")||'<p class="mu">Belum ada banner.</p>'
+}catch(e){msg(e.message)}
 }
 function bthumb(){$("bth").innerHTML=BIMG?`<div><img src="${esc(BIMG)}" alt="Foto banner" style="width:140px;height:70px"><button id="brm" aria-label="Hapus foto">×</button></div>`:""}
 function bform(b){BEID=b?b.id:null;$("bft").textContent=b?"Ubah banner":"Banner baru";$("bt").value=b?b.title:"";$("bsub").value=b?b.subtitle:"";$("blk").value=b&&b.link?b.link:"";$("bord").value=b?b.sort:BN.length+1;$("bact").checked=b?b.active:true;BIMG=b?b.image_url:null;bthumb();$("bf").hidden=false;$("bf").scrollIntoView()}
@@ -250,22 +273,22 @@ $("bnew").onclick=()=>bform(null);$("bcx").onclick=()=>$("bf").hidden=true;
 $("bth").onclick=e=>{if(e.target.id==="brm"){BIMG=null;bthumb()}};
 $("bfile").onchange=async e=>{const f=e.target.files[0];e.target.value="";if(!f)return;try{BIMG=await upImg(f,"banners");bthumb()}catch(x){msg(x.message)}};
 $("blist").onclick=async e=>{
-  const be=e.target.dataset.be,bd=e.target.dataset.bd;
-  if(be)bform(BN.find(b=>b.id===be));
-  if(bd&&confirm("Hapus banner ini?")){try{await rest("banners?id=eq."+bd,{method:"DELETE"});msg("Banner dihapus");loadB()}catch(x){msg(x.message)}}
+const be=e.target.dataset.be,bd=e.target.dataset.bd;
+if(be)bform(BN.find(b=>b.id===be));
+if(bd&&confirm("Hapus banner ini?")){try{await rest("banners?id=eq."+bd,{method:"DELETE"});msg("Banner dihapus");loadB()}catch(x){msg(x.message)}}
 };
 $("bsv").onclick=async()=>{
-  const t=$("bt").value.trim(),l=$("blk").value.trim();
-  if(!t&&!BIMG)return msg("Isi judul atau unggah foto");
-  if(l&&!/^(https?:\/\/|#)/.test(l))return msg("Link harus diawali https:// atau #");
-  const body=JSON.stringify({title:t,subtitle:$("bsub").value.trim(),link:l||null,sort:parseInt($("bord").value,10)||0,active:$("bact").checked,image_url:BIMG});
-  try{await rest(BEID?"banners?id=eq."+BEID:"banners",{method:BEID?"PATCH":"POST",body});msg("Banner tersimpan");$("bf").hidden=true;loadB()}catch(x){msg(x.message)}
+const t=$("bt").value.trim(),l=$("blk").value.trim();
+if(!t&&!BIMG)return msg("Isi judul atau unggah foto");
+if(l&&!/^(https?:\/\/|#)/.test(l))return msg("Link harus diawali https:// atau #");
+const body=JSON.stringify({title:t,subtitle:$("bsub").value.trim(),link:l||null,sort:parseInt($("bord").value,10)||0,active:$("bact").checked,image_url:BIMG});
+try{await rest(BEID?"banners?id=eq."+BEID:"banners",{method:BEID?"PATCH":"POST",body});msg("Banner tersimpan");$("bf").hidden=true;loadB()}catch(x){msg(x.message)}
 };
 // ===== PENGATURAN =====
 const SK={store_name:"s1",wa_number:"s2",instagram:"s3",tiktok:"s4",shopee:"s5",couriers:"s6"};
 async function loadS(){try{(await rest("store_settings?select=key,value")).forEach(r=>{if(SK[r.key])$(SK[r.key]).value=r.value});if(!$("s6").value)$("s6").value="JNE\nJ&T\nSiCepat\nAnterAja\nPos Indonesia";const cl=$("s6").value.split(/\n|,/).map(x=>x.trim()).filter(Boolean);if(cl.length)CO=["",...cl];renderO()}catch(e){msg(e.message)}}
 $("ssv").onclick=async()=>{
-  try{await rest("store_settings?on_conflict=key",{method:"POST",headers:{Prefer:"resolution=merge-duplicates"},body:JSON.stringify(Object.entries(SK).map(([key,id])=>({key,value:$(id).value.trim()})))});msg("Pengaturan tersimpan")}catch(e){msg(e.message)}
+try{await rest("store_settings?on_conflict=key",{method:"POST",headers:{Prefer:"resolution=merge-duplicates"},body:JSON.stringify(Object.entries(SK).map(([key,id])=>({key,value:$(id).value.trim()})))});msg("Pengaturan tersimpan")}catch(e){msg(e.message)}
 };
 if(S)start().catch(()=>logout(""));
 </script>
