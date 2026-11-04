@@ -1,0 +1,20 @@
+<!DOCTYPE html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Cadangan – Custom Stuff</title>
+<style>body{margin:0;background:#fff7fa;color:#3b2340;font:16px/1.5 system-ui,sans-serif}main{max-width:520px;margin:0 auto;padding:20px}.c{background:#fff;border:2px solid #ffa6c4;border-radius:16px;padding:16px}button{font:inherit;border:0;border-radius:10px;padding:12px 16px;background:#d6336c;color:#fff;font-weight:700;width:100%}button:disabled{opacity:.5}.m{color:#7d6a85;font-size:14px}</style></head><body><main><div class="c"><h1 style="margin:0 0 8px;font-size:22px">Cadangan data</h1>
+<p>Mengunduh satu file berisi semua produk, kategori, banner, pengaturan, dan pesanan. Simpan file itu di tempat aman, misalnya Google Drive pribadimu. Kamu tidak perlu membukanya.</p>
+<p class="m">File ini berisi data pelanggan (nama, HP, alamat). Jangan dibagikan ke siapa pun. Disarankan sekali seminggu.</p>
+<button id="go">Unduh cadangan</button><p id="st" class="m"></p><p class="m"><a href="admin.html">Kembali ke panel owner</a></p></div></main>
+<script src="config.js"></script>
+<script>
+const K=CS.key,U=CS.url.replace(/\/$/,""),$=id=>document.getElementById(id);
+let S=null;try{S=JSON.parse(localStorage.getItem("cs_admin"))}catch(e){}
+async function tok(){if(!S)throw new Error("Belum login. Buka admin.html dan login dulu.");
+if(S.exp-Date.now()/1000<60){const r=await fetch(U+"/auth/v1/token?grant_type=refresh_token",{method:"POST",headers:{apikey:K,"Content-Type":"application/json"},body:JSON.stringify({refresh_token:S.rt})});if(!r.ok)throw new Error("Sesi habis. Buka admin.html dan login lagi.");const j=await r.json();S={at:j.access_token,rt:j.refresh_token,exp:j.expires_at||Date.now()/1000+j.expires_in};localStorage.setItem("cs_admin",JSON.stringify(S))}return S.at}
+async function rest(p,o={}){const r=await fetch(U+"/rest/v1/"+p,{...o,headers:{apikey:K,Authorization:"Bearer "+await tok(),"Content-Type":"application/json"}});if(!r.ok)throw new Error("Gagal mengambil data ("+r.status+")");return r.json()}
+async function all(p){let o=[],i=0;for(;;){const r=await rest(p+"&limit=1000&offset="+i);o=o.concat(r);if(r.length<1000)return o;i+=1000}}
+$("go").onclick=async()=>{const b=$("go"),s=$("st");b.disabled=true;s.textContent="Menyiapkan cadangan…";
+try{if(await rest("rpc/is_admin",{method:"POST",body:"{}"})!==true)throw new Error("Akun ini bukan owner.");
+const d={dibuat:new Date().toISOString(),versi:1,store_settings:await all("store_settings?select=*&order=key"),categories:await all("categories?select=*&order=sort"),products:await all("products?select=*&order=created_at"),banners:await all("banners?select=*&order=sort"),orders:await all("orders?select=*,order_items(*)&order=created_at"),order_status_history:await all("order_status_history?select=*&order=changed_at")};
+const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(d,null,1)],{type:"application/json"}));a.download="cadangan-customstuff-"+new Date().toISOString().slice(0,10)+".json";document.body.appendChild(a);a.click();a.remove();
+s.textContent="Selesai. Simpan file itu di tempat aman. ("+d.orders.length+" pesanan, "+d.products.length+" produk)"}catch(e){s.textContent=e.message}
+b.disabled=false};
+</script></body></html>
